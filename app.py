@@ -1,6 +1,8 @@
 from flask import Flask, Response, request, render_template, jsonify, json
 import pymongo
 import re
+import string
+import random
 
 
 # create database
@@ -79,8 +81,15 @@ def catch_all_put(myPath):
     # obtain the json data
     json_data = request_info.data
 
-    # load it into dictionary
-    dict_data = json.loads(json_data)
+    # load it into dictionary, if data sent are not a valid json, store it as string
+    try:
+        dict_data = json.loads(json_data)
+    except:
+        dict_data = json_data
+
+    # check if it is a list and then add id to the data
+    if type(dict_data) is list:
+        dict_data = dict(zip([str(i) for i in range(len(dict_data))], dict_data))
 
     keys = request_info.key
 
@@ -88,14 +97,13 @@ def catch_all_put(myPath):
     num_key = len(keys)
 
     if num_key == 1:
-        data = {"$set": {"data": dict_data}}
+        data = {"$set": {keys[0]: dict_data}}
+        data_collect.update_one({keys[0]: {"$exists": True}}, data, upsert=True)
     else:
-        # nested documents
-        """
-        need to implement this
-        """
-        return "PUT: Need to implement access to nested document"
-    data_collect.update_one({"_id": keys[0]}, data, upsert=True)
+        # nested document
+        joined_key = '.'.join(keys)
+        data = {"$set": {joined_key: dict_data}}
+        data_collect.update_one({keys[0]: {"$exists": True}}, data, upsert=True)
 
     # return data that is insert into the database
     return jsonify(dict_data)
@@ -110,13 +118,20 @@ def catch_all_get(myPath):
     # access the collection
     data_collect = db[request_info.collection]
 
+
+    keys = request_info.key
+
+    # check the length of keys
+    num_key = len(keys)
+
     # find the data
     if request_info.operators == {}:
         # check for the number of keys
-        if len(request_info.key) > 1:
-            return "Get: Need to implement method for nested documents"
+        if num_key > 1:
+            joined_key = '.'.join(keys)
         else:
-            cursor = data_collect.find({"_id": request_info.key[0]}, {"_id": 0})
+            joined_key = keys[0]
+        cursor = data_collect.find({joined_key: {"$exists": True}}, {joined_key: 1, '_id': 0})
     else:
         # if there exist operators
         """
@@ -127,10 +142,15 @@ def catch_all_get(myPath):
     data = []
 
     for document in cursor:
-        data.append(str(document['data']))
+        temp = document
+        key_list = joined_key.split('.')
+        # loop over keys to get only the stored value
+        for key in key_list:
+            temp = temp[key]
+        data.append(temp)
 
     if len(data) == 0:
-        data.append("Error: {key} not found".format(key=request_info.key[0]))
+        data.append("Error: {key} not found".format(key=joined_key))
 
     return jsonify(data[0])
 
@@ -161,22 +181,38 @@ def catch_all_post(myPath):
     if num_key == 1:
         data = {"$set": {"data": dict_data}}
         # check if the key exists
-        cursor = data_collect.find({"_id": {"$regex": keys[0]}})
-        num_matched = len(list(cursor))
-    else:
-        # nested documents
-        """
-        need to implement this
-        """
-        return "POST: Need to implement access to nested document"
+        cursor = data_collect.find({keys[0]: {"$exists": True}})
 
-    if num_matched > 0:
-        data_collect.insert_one({"_id": keys[0] + '_' + str(num_matched), "data": dict_data})
-        msg = "Generated New Key: " + keys[0] + '_' + str(num_matched) + " " + str(dict_data)
+        if len(list(cursor)) > 0: # already exists
+            N = 8
+            # using random.choices()
+            # generating random strings
+            res = ''.join(random.choices(string.ascii_letters, k=N))
+
+            data_collect.insert_one({keys[0] + '_' + res: dict_data})
+            msg = str({"name": keys[0]+'_'+res})
+        else:
+            data_collect.insert_one({keys[0]: dict_data})
+            msg = ''
+
     else:
-        data_collect.insert_one({"_id": keys[0], "data": dict_data})
-        msg = str(dict_data)
-    # return data that is insert into the database
+
+        joined_key = '.'.join(keys)
+        cursor = data_collect.find({joined_key: {"$exists": True}})
+        if len(list(cursor)) > 0:  # already exists:
+            N = 8
+            # using random.choices()
+            # generating random strings
+            res = ''.join(random.choices(string.ascii_letters, k=N))
+
+            data = {"$set": {joined_key + '_' +res: dict_data}}
+            data_collect.update_one({keys[0]: {"$exists": True}}, data, upsert=True)
+            msg = str({"name": keys[-1] + '_' + res})
+        else:
+            data = {"$set": {joined_key: dict_data}}
+            data_collect.update_one({keys[0]: {"$exists": True}}, data, upsert=True)
+            msg = ''
+
     return msg
 
 
@@ -196,15 +232,12 @@ def catch_all_delete(myPath):
 
     if num_key == 1:
         # check if the key exists
-        data_collect.delete_one({"_id": keys[0]})
+        data_collect.delete_one({keys[0]: {"$exists": True}})
     else:
-        # nested documents
-        """
-        need to implement this
-        """
-        return "DELETE: Need to implement access to nested document"
+        joined_key = '.'.join(keys)
+        data_collect.update_one({keys[0]: {"$exists": True}},{"$unset":{joined_key: ""}})
 
-    return "DELETED"
+    return ""
 
 
 @app.route('/<path:myPath>', methods=['PATCH'])
