@@ -34,37 +34,37 @@ class RequestInfo():
 
     def __init__(self):
         self.root_database = "root"
+
+
         self.paths = request.path.split('/')[1:]
-        self.collection = "database"
+        self.collection = self.paths[0]
         self.fullpath = request.full_path
         self.data = request.get_data().decode('utf-8')
         self.operators = {}
-        self.key = self.paths
+        self.key = self.paths[1:]
 
         # check for .json ending
-        temp = self.key[-1].split(".")
-        if len(temp) >= 2:
-            self.key[-1] = temp[0]
+        if len(self.key) > 0 :
+            temp = self.key[-1].split(".")
+            if len(temp) >= 2:
+                self.key[-1] = temp[0]
+        else:
+            temp = self.collection.split(".")
+            if len(temp) >= 2:
+                self.collection[-1] = temp[0]
 
         # check for operators
-        temp = self.paths[-1].split("?")
-        if len(temp) >= 2:
+        temp = self.fullpath.split("?")
+        if len(temp) >= 2 and temp[1] != '':
             operators_str = temp[1]
             operators_list = operators_str.split("&")
             for operators in operators_list:
-                operator = re.findall(r'(=|>|<)', operators)
-                # check if there are two operator; e.g ">", "="
-                if len(operator) == 2:
-                    if operator[1] == "=":
-                        operator = "".join(operator)
-                else:
-                    operator = operator[0]
+                key_value = operators.split("=")
 
-                name_value = operators.split(operator)
-                name = name_value[0]
-                value = name_value[1]
+                name = key_value[0]
+                value = key_value[1]
 
-                self.operators[name] = [operator, value]
+                self.operators[name] = value
 
 
 app = Flask(__name__)
@@ -85,25 +85,27 @@ def catch_all_put(myPath):
     try:
         dict_data = json.loads(json_data)
     except:
-        dict_data = json_data
+        return str(json_data) + "Not a valid json"
 
     # check if it is a list and then add id to the data
     if type(dict_data) is list:
-        dict_data = dict(zip([str(i) for i in range(len(dict_data))], dict_data))
+        dict_data = list(map(lambda x, y: {"_id": str(x), "data": y}, range(len(dict_data)), dict_data))
 
     keys = request_info.key
 
     # check the length of keys
     num_key = len(keys)
 
-    if num_key == 1:
-        data = {"$set": {keys[0]: dict_data}}
-        data_collect.update_one({keys[0]: {"$exists": True}}, data, upsert=True)
+    if num_key == 0: # no sub key, just insert into the collection
+        data_collect.drop()
+        data_collect.insert_many(dict_data)
+    elif num_key == 1:
+        data = {"$set": {'data': dict_data}}
+        data_collect.update_one({'_id': keys[0]}, data, upsert=True)
     else:
         # nested document
-        joined_key = '.'.join(keys)
-        data = {"$set": {joined_key: dict_data}}
-        data_collect.update_one({keys[0]: {"$exists": True}}, data, upsert=True)
+        raise NotImplementedError
+
 
     # return data that is insert into the database
     return jsonify(dict_data)
@@ -118,7 +120,6 @@ def catch_all_get(myPath):
     # access the collection
     data_collect = db[request_info.collection]
 
-
     keys = request_info.key
 
     # check the length of keys
@@ -127,13 +128,52 @@ def catch_all_get(myPath):
     # find the data
     if request_info.operators == {}:
         # check for the number of keys
-        if num_key > 1:
-            joined_key = '.'.join(keys)
+        if num_key == 0:
+            cursor = data_collect.find({}, {'data':1, '_id':0})
+        elif num_key == 1:
+            cursor = data_collect.find({'_id': keys[0]}, {'data': 1, '_id': 0})
         else:
-            joined_key = keys[0]
-        cursor = data_collect.find({joined_key: {"$exists": True}}, {joined_key: 1, '_id': 0})
+            # nested document
+            raise NotImplementedError
+
     else:
-        # if there exist operators
+        if num_key > 0:
+            raise NotImplementedError
+        else:
+
+            # if there exist operators
+            match = {}
+            operators = request_info.operators
+            pipeline = []
+            if 'orderBy' in operators:
+                target_var = 'data.' + operators['orderBy']
+                for operation in operators:
+                    if operation != 'orderBy':
+                        if operation == 'startAt':
+                            match['$gte'] = int(operators[operation])
+                            pipeline.append({'$match': {target_var: match}})
+                        elif operation == 'endAt':
+                            match['$lte'] = int(operators[operation])
+                            pipeline.append({'$match': {target_var: match}})
+                        elif operation == 'equalTo':
+                            match['$eq'] = int(operators[operation])
+                            pipeline.append({'$match': {target_var: match}})
+                        elif operation == 'limitToFirst':
+                            limit = {'$limit': int(operators[operation])}
+                            sort = {'$sort':{target_var:1}}
+                            pipeline.append(limit)
+                            pipeline.append(sort)
+                        elif operation == 'limitToLast':
+                            limit = {'$limit': int(operators[operation])}
+                            sort = {'$sort':{target_var:-1}}
+                            pipeline.append(limit)
+                            pipeline.append(sort)
+                        else:
+                            sort = ''
+                if pipeline == []:
+                    return "Error: Operation not found"
+                cursor = data_collect.aggregate(pipeline)
+
         """
         Implement this
         """
@@ -142,17 +182,13 @@ def catch_all_get(myPath):
     data = []
 
     for document in cursor:
-        temp = document
-        key_list = joined_key.split('.')
         # loop over keys to get only the stored value
-        for key in key_list:
-            temp = temp[key]
+        temp = document['data']
         data.append(temp)
 
     if len(data) == 0:
-        data.append("Error: {key} not found".format(key=joined_key))
-
-    return jsonify(data[0])
+        data.append("Error: data not found")
+    return str(data)
 
 
 @app.route('/<path:myPath>', methods=['POST'])
@@ -230,12 +266,14 @@ def catch_all_delete(myPath):
     # check the length of keys
     num_key = len(keys)
 
-    if num_key == 1:
+    if num_key == 0:
+        data_collect.drop()
+    elif num_key == 1:
         # check if the key exists
-        data_collect.delete_one({keys[0]: {"$exists": True}})
+        data_collect.delete_one({'_id': keys[0]})
     else:
-        joined_key = '.'.join(keys)
-        data_collect.update_one({keys[0]: {"$exists": True}},{"$unset":{joined_key: ""}})
+        # nested document
+        raise NotImplementedError
 
     return ""
 
