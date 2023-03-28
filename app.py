@@ -77,12 +77,11 @@ def catch_all_put(myPath):
 
     # obtain the json data
     json_data = request_info.data
-
     # load it into dictionary, if data sent are not a valid json, store it as string
     try:
         dict_data = json.loads(json_data)
     except:
-        return str(json_data) + "Not a valid json"
+        return str(json_data) + " Not a valid json"
 
     # check if it is a list and then add id to the data
     if type(dict_data) is list:
@@ -171,6 +170,8 @@ def catch_all_get(myPath):
                             sort = ''
                 if pipeline == []:
                     return "Error: Operation not found"
+                elif '$sort' not in pipeline:
+                    pipeline.append({'$sort':{target_var:1}})
                 cursor = data_collect.aggregate(pipeline)
 
         """
