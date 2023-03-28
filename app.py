@@ -26,10 +26,7 @@ class RequestInfo():
     fullpath: the full requested path
     data: josn data from the request
     keys: requested keys
-    operators: dictionary that store all operators in the request.
-        Key is the name, Values are lists;
-        The first element is the operator, e.g. =， >, >=
-        The second element is the value
+    operators: dictionary that store all operators in the requests
     """
 
     def __init__(self):
@@ -90,6 +87,8 @@ def catch_all_put(myPath):
     # check if it is a list and then add id to the data
     if type(dict_data) is list:
         dict_data = list(map(lambda x, y: {"_id": str(x), "data": y}, range(len(dict_data)), dict_data))
+    else:
+        raise NotImplementedError
 
     keys = request_info.key
 
@@ -161,13 +160,13 @@ def catch_all_get(myPath):
                         elif operation == 'limitToFirst':
                             limit = {'$limit': int(operators[operation])}
                             sort = {'$sort':{target_var:1}}
-                            pipeline.append(limit)
                             pipeline.append(sort)
+                            pipeline.append(limit)
                         elif operation == 'limitToLast':
                             limit = {'$limit': int(operators[operation])}
                             sort = {'$sort':{target_var:-1}}
-                            pipeline.append(limit)
                             pipeline.append(sort)
+                            pipeline.append(limit)
                         else:
                             sort = ''
                 if pipeline == []:
@@ -194,8 +193,7 @@ def catch_all_get(myPath):
 @app.route('/<path:myPath>', methods=['POST'])
 def catch_all_post(myPath):
     """
-    :param myPath:
-    :return:
+    NEED UPDATE. BUGs
     """
     request_info = RequestInfo()
     db = MongoDB(request_info.root_database).db
