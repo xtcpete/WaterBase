@@ -41,14 +41,14 @@ class RequestInfo():
         self.key = self.paths[1:]
 
         # check for .json ending
-        if len(self.key) > 0 :
+        if len(self.key) > 0:
             temp = self.key[-1].split(".")
             if len(temp) >= 2:
                 self.key[-1] = temp[0]
         else:
             temp = self.collection.split(".")
             if len(temp) >= 2:
-                self.collection[-1] = temp[0]
+                self.collection = temp[0]
 
         # check for operators
         temp = self.fullpath.split("?")
@@ -85,9 +85,11 @@ def catch_all_put(myPath):
 
     # check if it is a list and then add id to the data
     if type(dict_data) is list:
-        dict_data = list(map(lambda x, y: {"_id": str(x), "data": y}, range(len(dict_data)), dict_data))
+        if len(request_info.key) == 0:
+            dict_data = list(map(lambda x, y: {"_id": str(x), "data": y}, range(len(dict_data)), dict_data))
     else:
-        raise NotImplementedError
+        if len(request_info.key) == 0:  # create _id for data stored under the first level key
+            dict_data = [{"_id": '0', "data": dict_data}]
 
     keys = request_info.key
 
@@ -102,11 +104,11 @@ def catch_all_put(myPath):
         data_collect.update_one({'_id': keys[0]}, data, upsert=True)
     else:
         # nested document
-        raise NotImplementedError
+        joined_key = 'data.' + '.'.join(keys[1:])
+        data = {"$set": {joined_key: dict_data}}
+        data_collect.update_one({'_id': keys[0]}, data, upsert=True)
 
-
-    # return data that is insert into the database
-    return jsonify(dict_data)
+    return ''
 
 
 @app.route('/<path:myPath>', methods=['GET'])
@@ -131,8 +133,8 @@ def catch_all_get(myPath):
         elif num_key == 1:
             cursor = data_collect.find({'_id': keys[0]}, {'data': 1, '_id': 0})
         else:
-            # nested document
-            raise NotImplementedError
+            joined_key = "data." + '.'.join(keys[1:])
+            cursor = data_collect.find({'_id': keys[0], joined_key: {"$exists": True}}, {joined_key: 1, '_id': 0})
 
     else:
         if num_key > 0:
@@ -174,21 +176,24 @@ def catch_all_get(myPath):
                     pipeline.append({'$sort':{target_var:1}})
                 cursor = data_collect.aggregate(pipeline)
 
-        """
-        Implement this
-        """
-        data = "Need to implement methods for operators"
-
     data = []
 
     for document in cursor:
         # loop over keys to get only the stored value
         temp = document['data']
+        if len(keys) > 1:
+            i = 1
+            while i <= len(keys) - 1:
+                temp = temp[keys[i]]
+                i += 1
         data.append(temp)
 
     if len(data) == 0:
         data.append("Error: data not found")
-    return str(data)
+    elif len(data) == 1:
+        data = data[0]
+
+    return jsonify(data)
 
 
 @app.route('/<path:myPath>', methods=['POST'])
@@ -272,7 +277,9 @@ def catch_all_delete(myPath):
         data_collect.delete_one({'_id': keys[0]})
     else:
         # nested document
-        raise NotImplementedError
+        joined_key = "data." + '.'.join(keys[1:])
+        data = {"$unset": {joined_key: ""}}
+        data_collect.update_one({'_id': keys[0]}, data)
 
     return ""
 
