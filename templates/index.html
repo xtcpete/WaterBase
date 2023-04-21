@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <meta charset="UTF-8">
+        <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='css/style.css') }}">
+        <title>WaterBase</title>
+        <script src="//code.jquery.com/jquery-1.12.4.min.js"></script>
+        <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.0/socket.io.js"></script>
+    </head>
+
+
+    <h1>Welcome to WaterBase</h1>
+
+    <body>
+        <script type = text/javascript>
+            var data = {{ all_data|tojson }};
+
+            for(var collection in data) {
+                var newdiv = document.createElement('div');
+                var divIdName = collection;
+                newdiv.setAttribute('id',divIdName);
+                newdiv.innerHTML ='<h2><button id="button-'+divIdName+'" onclick="showData('+divIdName+')">></button>    '+collection+'</h2>';
+                document.body.appendChild(newdiv);
+                var newline = document.createElement('hr');
+                document.body.appendChild(newline)
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                var socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
+
+                socket.on('put', (_data) => {
+                    var collection = _data['collection'];
+                    var keys = _data['keys'];
+                    var new_data = _data['data'];
+                    var dataToChange = data[collection];
+                    var element_id = collection + '_' + keys.join("_");
+
+                    if (keys.length > 0){
+                        var foundIndex = dataToChange.findIndex(x => x._id == keys[0]);
+                        console.log(foundIndex)
+                        if (foundIndex > 0){
+                            dataToChange = dataToChange[foundIndex];
+                            keys.shift();
+                            var dataChanged = setProperty(dataToChange, 'data.'+keys.join('.'), new_data);
+                            data[collection][foundIndex] = dataChanged;
+                        }
+                        else{
+                            var dataChanged = {'_id': keys[0], 'data': new_data};
+                            data[collection].push(dataChanged);
+                        }
+                        console.log(data);
+                    }
+                    else{
+                        data[collection] = _data;
+                    }
+
+                    var element = document.getElementById(element_id);
+
+                    if (element != null){
+                        element.innerText = keys[keys.length-1]+" : "+new_data;
+                    }
+                    else {
+                        var keys = element_id.split('_')
+                        keys.pop()
+                        element_id = keys.join("_");
+                        var element = document.getElementById(element_id);
+                        console.log(element_id)
+                        console.log(data)
+                        showData(element)
+
+                        showData(element)
+                    }
+                });
+
+                socket.on('delete', (_data) => {
+                    var collection = _data['collection'];
+                    var keys = _data['keys'];
+
+                    var element_id = collection + '_' + keys.join("_");
+
+                    var element = document.getElementById(element_id)
+                    var dataToChange = data[collection]
+
+                    if (keys.length == 0){
+                        delete data
+                        document.getElementById(collection).remove()
+                    }
+                    if (element != null){
+                        element.remove()
+                        if (keys.length > 0){
+                            var foundIndex = dataToChange.findIndex(x => x._id == keys[0]);
+
+                            if (foundIndex > 0){
+                                dataToChange = dataToChange[foundIndex];
+                                keys.shift()
+                                deletePropertyPath(dataToChange, 'data.'+keys.join('.'))
+                                var dataChanged = dataToChange
+                                data[collection][foundIndex] = dataChanged;
+                            }
+
+                            console.log(data);
+                        }
+                        else{
+                            delete data[collection]
+                        }
+                    }
+                })
+
+            });
+        </script>
+
+    </body>
+
+    <script type="text/javascript">
+        const setProperty = (obj, path, value) => {
+            const [head, ...rest] = path.split('.')
+
+            return {
+                ...obj,
+                [head]: rest.length
+                    ? setProperty(obj[head], rest.join('.'), value)
+                    : value
+            }
+        };
+
+        function deletePropertyPath (obj, path) {
+
+          if (!obj || !path) {
+            return;
+          }
+
+          if (typeof path === 'string') {
+            path = path.split('.');
+          }
+
+          for (var i = 0; i < path.length - 1; i++) {
+
+            obj = obj[path[i]];
+
+            if (typeof obj === 'undefined') {
+              return;
+            }
+          }
+
+          delete obj[path.pop()];
+        };
+
+        function showData(doc) {
+            var _id = doc.getAttribute('id');
+            var new_data = data[_id];
+            var num_level = _id.split('_').length;
+            var margin = 20 * num_level;
+            var divs = doc.getElementsByTagName('div');
+            var num_divs = divs.length;
+            console.log(doc)
+            if (divs.length > 0){
+                document.getElementById('button-'+_id).innerText = '>'
+                for (i=0; i < num_divs; i++){
+                    divs[0].remove();
+                }
+            }
+
+            else{
+                document.getElementById('button-'+_id).innerText = '<'
+
+                if (new_data) {
+                    for (i = 0; i <= new_data.length - 1; i++) {
+                        var record = new_data[i];
+                        var newdiv = document.createElement('div');
+
+                        var divIdName = _id + '_' + record['_id'];
+                        newdiv.setAttribute('id', divIdName);
+                        newdiv.setAttribute('style', 'margin-left: ' + margin + 'px;')
+                        newdiv.innerHTML = '<h3><button id="button-'+divIdName+'" onclick="showData('+divIdName+')">></button>    ' + record['_id'] + '</h3>';
+                        doc.appendChild(newdiv);
+                    }
+                }
+
+                else{
+                    var keys = _id.split('_');
+                    new_data = data[keys[0]];
+                    var results = new_data.filter(function (entry) { return entry._id === keys[1]; });
+                    new_data = results[0]['data'];
+
+                    if (new_data){
+                        for (var _key in new_data){
+                            var divIdName = _id + '_' + _key;
+                            if (typeof new_data[_key] != 'object'){
+                                var newdiv = document.createElement('div');
+                                newdiv.setAttribute('id', divIdName)
+                                newdiv.setAttribute('style', 'margin-left: ' + margin + 'px;');
+                                newdiv.innerText = _key + " : " + new_data[_key];
+                                doc.appendChild(newdiv);
+                            }
+                            else{
+                                var newdiv = document.createElement('div');
+                                newdiv.setAttribute('id', divIdName);
+                                newdiv.setAttribute('style', 'margin-left: ' + margin + 'px;')
+                                newdiv.innerHTML = '<h3><button id="button-'+divIdName+'" onclick="showData('+divIdName+')">></button>    ' + _key + '</h3>';
+                                doc.appendChild(newdiv);
+                            }
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+</html>

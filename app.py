@@ -1,6 +1,6 @@
 from flask import Flask, Response, request, render_template, jsonify, json
+from flask_socketio import SocketIO, emit
 import pymongo
-import re
 import string
 import random
 
@@ -31,24 +31,27 @@ class RequestInfo():
 
     def __init__(self):
         self.root_database = "root"
-
-
         self.paths = request.path.split('/')[1:]
         self.collection = self.paths[0]
         self.fullpath = request.full_path
         self.data = request.get_data().decode('utf-8')
         self.operators = {}
         self.key = self.paths[1:]
+        self.json = False
 
         # check for .json ending
         if len(self.key) > 0:
             temp = self.key[-1].split(".")
             if len(temp) >= 2:
                 self.key[-1] = temp[0]
+                if temp[1] == 'json':
+                    self.json = True
         else:
             temp = self.collection.split(".")
             if len(temp) >= 2:
                 self.collection = temp[0]
+                if temp[1] == 'json':
+                    self.json = True
 
         # check for operators
         temp = self.fullpath.split("?")
@@ -65,6 +68,17 @@ class RequestInfo():
 
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'secret!'
+socketio = SocketIO(app)
+
+@app.route('/')
+def index():
+    db = MongoDB('root').db
+    collections = db.list_collection_names()
+    all_data = {}.fromkeys(collections)
+    for collection in collections:
+        all_data[collection] = [x for x in db.get_collection(collection).find()]
+    return render_template("index.html", all_data=all_data)
 
 
 @app.route('/<path:myPath>', methods=['PUT'])
@@ -108,6 +122,7 @@ def catch_all_put(myPath):
         data = {"$set": {joined_key: dict_data}}
         data_collect.update_one({'_id': keys[0]}, data, upsert=True)
 
+    socketio.emit('put', {'collection': request_info.collection, 'keys': keys, "data": dict_data}, broadcast=True)
     return ''
 
 
@@ -192,9 +207,10 @@ def catch_all_get(myPath):
         data.append("Error: data not found")
     elif len(data) == 1:
         data = data[0]
-
-    return jsonify(data)
-
+    if request_info.json:
+        return jsonify(data)
+    else:
+        return ""
 
 @app.route('/<path:myPath>', methods=['POST'])
 def catch_all_post(myPath):
@@ -281,6 +297,7 @@ def catch_all_delete(myPath):
         data = {"$unset": {joined_key: ""}}
         data_collect.update_one({'_id': keys[0]}, data)
 
+    socketio.emit('delete', {'collection': request_info.collection, 'keys': keys}, broadcast=True)
     return ""
 
 
@@ -296,4 +313,4 @@ def catach_all_patch(myPath):
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    socketio.run(app, debug=True)
