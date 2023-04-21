@@ -104,6 +104,9 @@ def catch_all_put(myPath):
     else:
         if len(request_info.key) == 0:  # create _id for data stored under the first level key
             dict_data = [{"_id": '0', "data": dict_data}]
+        else:
+            if len(request_info.key) == 1:
+                dict_data = [{"_id": request_info.key[0], 'data': dict_data}]
 
     keys = request_info.key
 

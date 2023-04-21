@@ -18,11 +18,18 @@
 
             for(var collection in data) {
                 var newdiv = document.createElement('div');
+
                 var divIdName = collection;
+
                 newdiv.setAttribute('id',divIdName);
-                newdiv.innerHTML ='<h2><button id="button-'+divIdName+'" onclick="showData('+divIdName+')">></button>    '+collection+'</h2>';
+
+                newdiv.innerHTML ='<h2><button id="button-'+divIdName+'" onclick="showData('+divIdName+')">></button>    '+collection +
+                    '    <button id="add-'+divIdName+'" onclick="addData('+divIdName+')" style="display: inline; border: none">+</button></h2>';
+
                 document.body.appendChild(newdiv);
+
                 var newline = document.createElement('hr');
+
                 document.body.appendChild(newline)
             }
 
@@ -113,6 +120,22 @@
     </body>
 
     <script type="text/javascript">
+        class EasyHTTP {
+
+           // Make an HTTP PUT Request
+           async put(url, data) {
+
+            const response = await fetch(url, {
+              method: 'PUT',
+              headers: {
+                'Content-type': 'application/json'
+              },
+              body: data
+            });
+
+          }
+        };
+
         const setProperty = (obj, path, value) => {
             const [head, ...rest] = path.split('.')
 
@@ -146,6 +169,42 @@
           delete obj[path.pop()];
         };
 
+        function addData(doc) {
+            if (doc.getElementsByTagName('div').length === 0){
+                showData(doc)
+            }
+
+            if (doc.getElementsByTagName('input').length == 0){
+                var newdiv = document.createElement('div')
+                var _id = doc.getAttribute('id');
+                var num_level = _id.split('_').length;
+                var margin = 20 * num_level;
+                newdiv.setAttribute('id', 'input_form')
+                newdiv.setAttribute('style', 'margin-left: ' + margin + 'px;');
+                newdiv.innerHTML = '<input type="text", id="' + _id + '_key", name="' + _id + 'key", placeholder="key"/>' + " : " +
+                    '<input type="text", id="' + _id + '_value", name="' + _id + 'value", placeholder="value"/>' +
+                    '  <button onclick="putData()">add</button>';
+                doc.appendChild(newdiv);
+            }
+        };
+
+        function putData(){
+            var input_element = document.getElementById('input_form')
+            var inputs = input_element.getElementsByTagName('input')
+            var key = inputs[0].value
+            var value = inputs[1].value
+            var _id = inputs[0].getAttribute('id').split('_')
+
+            _id.pop()
+            var combined_id = _id.join('/')
+            const http = new EasyHTTP;
+            const data = value
+            var link = 'http://127.0.0.1:5000/' + combined_id + '/' + key + '.json'
+            console.log(link)
+            http.put(link, data).then(data => console.log(data)).catch(err => console.log(err));
+
+        };
+
         function showData(doc) {
             var _id = doc.getAttribute('id');
             var new_data = data[_id];
@@ -172,7 +231,12 @@
                         var divIdName = _id + '_' + record['_id'];
                         newdiv.setAttribute('id', divIdName);
                         newdiv.setAttribute('style', 'margin-left: ' + margin + 'px;')
-                        newdiv.innerHTML = '<h3><button id="button-'+divIdName+'" onclick="showData('+divIdName+')">></button>    ' + record['_id'] + '</h3>';
+                        if (typeof record['data'] == 'string' ){
+                            newdiv.innerHTML = '<h3>'+record['_id'] + " : " + record['data']+'</h3>';
+                        }else{
+                            newdiv.innerHTML = '<h3><button id="button-'+divIdName+'" onclick="showData('+divIdName+')">></button>    ' + record['_id'] +
+                            '    <button id="add-'+divIdName+'" onclick="addData('+divIdName+')" style="display: inline; border: none">+</button></h3>';
+                        }
                         doc.appendChild(newdiv);
                     }
                 }
@@ -190,14 +254,15 @@
                                 var newdiv = document.createElement('div');
                                 newdiv.setAttribute('id', divIdName)
                                 newdiv.setAttribute('style', 'margin-left: ' + margin + 'px;');
-                                newdiv.innerText = _key + " : " + new_data[_key];
+                                newdiv.innerHTML = '<h3>'+ _key + " : " + new_data[_key] + '</h3>';
                                 doc.appendChild(newdiv);
                             }
                             else{
                                 var newdiv = document.createElement('div');
                                 newdiv.setAttribute('id', divIdName);
                                 newdiv.setAttribute('style', 'margin-left: ' + margin + 'px;')
-                                newdiv.innerHTML = '<h3><button id="button-'+divIdName+'" onclick="showData('+divIdName+')">></button>    ' + _key + '</h3>';
+                                newdiv.innerHTML = '<h3><button id="button-'+divIdName+'" onclick="showData('+divIdName+')">></button>    ' + _key +
+                                    '    <button id="add-'+divIdName+'" onclick="addData('+divIdName+')" style="display: inline; border: none">+</button></h3>';
                                 doc.appendChild(newdiv);
                             }
                         }
