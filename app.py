@@ -125,7 +125,7 @@ def catch_all_put(myPath):
         data = {"$set": {joined_key: dict_data}}
         data_collect.update_one({'_id': keys[0]}, data, upsert=True)
 
-    socketio.emit('put', {'collection': request_info.collection, 'keys': keys, "data": dict_data}, broadcast=True)
+    socketio.emit('put', {'collection': request_info.collection, 'keys': keys, "data": dict_data})
     return ''
 
 
@@ -165,6 +165,7 @@ def catch_all_get(myPath):
             pipeline = []
             if 'orderBy' in operators:
                 target_var = 'data.' + operators['orderBy']
+                data_collect.create_index(target_var)
                 for operation in operators:
                     if operation != 'orderBy':
                         if operation == 'startAt':
@@ -300,7 +301,7 @@ def catch_all_delete(myPath):
         data = {"$unset": {joined_key: ""}}
         data_collect.update_one({'_id': keys[0]}, data)
 
-    socketio.emit('delete', {'collection': request_info.collection, 'keys': keys}, broadcast=True)
+    socketio.emit('delete', {'collection': request_info.collection, 'keys': keys})
     return ""
 
 
