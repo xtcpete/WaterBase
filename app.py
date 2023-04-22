@@ -241,10 +241,8 @@ def catch_all_get(myPath):
     if request_info.json:
         return jsonify(data)
     else:
-        return ""
-=======
+
         return "Error: Data format incorrect"
->>>>>>> Stashed changes
 
 @app.route('/<path:myPath>', methods=['POST'])
 def catch_all_post(myPath):
@@ -253,21 +251,15 @@ def catch_all_post(myPath):
     """
     request_info = RequestInfo()
     db = MongoDB(request_info.root_database).db
-
     # access the collection
     data_collect = db[request_info.collection]
-
     # obtain the json data
     json_data = request_info.data
-
     # load it into dictionary
     dict_data = json.loads(json_data)
-
     keys = request_info.key
-
     # check the length of keys
     num_key = len(keys)
-
     N = 8
     res = ''.join(random.choices(string.ascii_letters, k=N))    
     if num_key == 0:
@@ -293,7 +285,6 @@ def catch_all_post(myPath):
             msg = ''
 
     else:
-
         joined_key = '.'.join(keys)
         cursor = data_collect.find({joined_key: {"$exists": True}})
         if len(list(cursor)) > 0:  # already exists:
@@ -359,14 +350,10 @@ def catach_all_patch(myPath):
     except:
         return str(json_data) + " Not a valid json"
 
-    db = MongoDB(request_info.root_database)
-    collection = db[request_info.collection]
-    json_data = request_info['data']
   
     # check if it is a list and then add id to the data
         
 
-    return "PATCH"
     keys = request_info.key
 
     # check the length of keys
@@ -377,13 +364,11 @@ def catach_all_patch(myPath):
         data_collect.insert_many(dict_data)
     elif num_key == 1:
         data = {"$set": {'data': dict_data}}
-        data_collect.update_one({'_id': keys[0]}, data, upsert=False)
         data_collect.update_one({'_id': keys[0]}, data, upsert=True)
     else:
         # nested document
         joined_key = 'data.' + '.'.join(keys[1:])
         data = {"$set": {joined_key: dict_data}}
-        data_collect.update_one({'_id': keys[0]}, data, upsert=False)
         data_collect.update_one({'_id': keys[0]}, data, upsert=True)
 
     return ''
