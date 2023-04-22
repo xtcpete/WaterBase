@@ -300,7 +300,11 @@ def catch_all_delete(myPath):
         data = {"$unset": {joined_key: ""}}
         data_collect.update_one({'_id': keys[0]}, data)
 
-    socketio.emit('delete', {'collection': request_info.collection, 'keys': keys}, broadcast=True)
+    collections = db.list_collection_names()
+    all_data = {}.fromkeys(collections)
+    for collection in collections:
+        all_data[collection] = [x for x in db.get_collection(collection).find()]
+    socketio.emit('delete', {'collection': request_info.collection, 'keys':request_info.key, 'data': all_data}, broadcast=True)
     return ""
 
 

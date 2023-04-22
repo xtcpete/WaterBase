@@ -12,3 +12,9 @@ h2 {
 h3 {
     font-size: 15px;
 }
+
+#add-collection{
+    font-size: 20px;
+    display: inline;
+    border: none;
+}

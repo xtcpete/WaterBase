@@ -7,31 +7,143 @@
         <title>WaterBase</title>
         <script src="//code.jquery.com/jquery-1.12.4.min.js"></script>
         <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.0/socket.io.js"></script>
+        <script type="text/javascript">
+            function addCollection(){
+                if (document.getElementById('input_form') == null){
+                    var newdiv = document.createElement('div')
+
+                    newdiv.setAttribute('id', 'input_form')
+                    newdiv.innerHTML = '<br><input type="text", id="collection_key", name="collection_key", placeholder="key"/>' + " : " +
+                        '<input type="text", id="collection_value", name="collection_value", placeholder="value"/>' +
+                        '  <button onclick="putData()">add</button>';
+                    console.log(newdiv)
+                    document.body.appendChild(newdiv);
+                }
+                else{
+                    document.getElementById('input_form').remove()
+                }
+            };
+
+            class EasyHTTP {
+
+               // Make an HTTP PUT Request
+                async put(url, data) {
+
+                    const response = await fetch(url, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-type': 'application/json'
+                        },
+                        body: data
+                    });
+
+                };
+
+                async delete(url){
+                    const response = await fetch(url,{
+                        method: 'DELETE',
+                        headers: {
+                            'Content-type': 'application/json'
+                        },
+                    })
+                }
+            };
+
+            const setProperty = (obj, path, value) => {
+                const [head, ...rest] = path.split('.')
+
+                return {
+                    ...obj,
+                    [head]: rest.length
+                        ? setProperty(obj[head], rest.join('.'), value)
+                        : value
+                }
+            };
+
+            function deletePropertyPath (obj, path) {
+
+                if (!obj || !path) {
+                    return;
+                }
+
+                if (typeof path === 'string') {
+                    path = path.split('.');
+                }
+
+                for (var i = 0; i < path.length - 1; i++) {
+
+                    obj = obj[path[i]];
+                    if (typeof obj === 'undefined') {
+                        return;
+                    }
+                }
+
+                delete obj[path.pop()];
+            };
+
+            function putData(){
+                const input_element = document.getElementById('input_form')
+                const inputs = input_element.getElementsByTagName('input')
+                const key = inputs[0].value
+                const value = inputs[1].value
+                const _id = inputs[0].getAttribute('id').split('_')
+                const http = new EasyHTTP;
+
+                if (_id[0] =='collection'){
+                    const data = value
+                    const link = 'http://127.0.0.1:5000/' + key + '.json'
+                    console.log(link)
+                    http.put(link, data).then(data => console.log(data)).catch(err => console.log(err));
+                }
+                else{
+                    _id.pop()
+                    const combined_id = _id.join('/')
+                    const data = value
+                    const link = 'http://127.0.0.1:5000/' + combined_id + '/' + key + '.json'
+                    console.log(link)
+                    http.put(link, data).then(data => console.log(data)).catch(err => console.log(err));
+                }
+
+
+            };
+
+            function deleteData (doc){
+                var _id = doc.getAttribute('id')
+                console.log(_id)
+                var keys = _id.split('_')
+                const http = new EasyHTTP;
+
+                const link = 'http://127.0.0.1:5000/' + keys.join('/') + '.json'
+                http.delete(link)
+            }
+
+            function createCollectionElement (data){
+                for(var collection in data) {
+                    var newdiv = document.createElement('div');
+
+                    var divIdName = collection;
+
+                    newdiv.setAttribute('id',divIdName);
+
+                    newdiv.innerHTML ='<h2><button id="button-'+divIdName+'" onclick="showData('+divIdName+')">></button>    '+collection +
+                        '    <button id="add-'+divIdName+'" onclick="addData('+divIdName+')" style="display: inline; border: none">+</button>' +
+                        '    <button id="delete-'+divIdName+'" onclick="deleteData('+divIdName+')" style="display: inline; border: none">x</button></h2>';
+
+                    document.body.appendChild(newdiv);
+                }
+            };
+        </script>
     </head>
 
 
     <h1>Welcome to WaterBase</h1>
+    <button id="add-collection" onclick="addCollection()">+</button>
 
     <body>
         <script type = text/javascript>
             var data = {{ all_data|tojson }};
 
-            for(var collection in data) {
-                var newdiv = document.createElement('div');
-
-                var divIdName = collection;
-
-                newdiv.setAttribute('id',divIdName);
-
-                newdiv.innerHTML ='<h2><button id="button-'+divIdName+'" onclick="showData('+divIdName+')">></button>    '+collection +
-                    '    <button id="add-'+divIdName+'" onclick="addData('+divIdName+')" style="display: inline; border: none">+</button></h2>';
-
-                document.body.appendChild(newdiv);
-
-                var newline = document.createElement('hr');
-
-                document.body.appendChild(newline)
-            }
+            createCollectionElement(data)
 
             document.addEventListener('DOMContentLoaded', () => {
                 var socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
@@ -59,7 +171,7 @@
                         console.log(data);
                     }
                     else{
-                        data[collection] = _data;
+                        data[collection] = new_data;
                     }
 
                     var element = document.getElementById(element_id);
@@ -74,9 +186,16 @@
                         var element = document.getElementById(element_id);
                         console.log(element_id)
                         console.log(data)
-                        showData(element)
+                        if (element != null){
+                            showData(element)
 
-                        showData(element)
+                            showData(element)
+                        }
+                        else{
+                            document.body.innerHTML = '<h1>Welcome to WaterBase</h1><button id="add-collection" onclick="addCollection()">+</button>'
+                            console.log(data)
+                            createCollectionElement(data)
+                        }
                     }
                 });
 
@@ -87,188 +206,112 @@
                     var element_id = collection + '_' + keys.join("_");
 
                     var element = document.getElementById(element_id)
-                    var dataToChange = data[collection]
+
+                    data = _data['data']
 
                     if (keys.length == 0){
-                        delete data
                         document.getElementById(collection).remove()
                     }
                     if (element != null){
                         element.remove()
-                        if (keys.length > 0){
-                            var foundIndex = dataToChange.findIndex(x => x._id == keys[0]);
-
-                            if (foundIndex > 0){
-                                dataToChange = dataToChange[foundIndex];
-                                keys.shift()
-                                deletePropertyPath(dataToChange, 'data.'+keys.join('.'))
-                                var dataChanged = dataToChange
-                                data[collection][foundIndex] = dataChanged;
-                            }
-
-                            console.log(data);
-                        }
-                        else{
-                            delete data[collection]
-                        }
                     }
                 })
 
             });
         </script>
 
-    </body>
+        <script type="text/javascript">
 
-    <script type="text/javascript">
-        class EasyHTTP {
+            function addData(doc) {
+                if (doc.getElementsByTagName('div').length === 0){
+                    showData(doc)
+                }
 
-           // Make an HTTP PUT Request
-           async put(url, data) {
+                if (doc.getElementsByTagName('input').length == 0){
+                    var newdiv = document.createElement('div')
+                    var _id = doc.getAttribute('id');
+                    var num_level = _id.split('_').length;
+                    var margin = 20 * num_level;
+                    newdiv.setAttribute('id', 'input_form')
+                    newdiv.setAttribute('style', 'margin-left: ' + margin + 'px;');
+                    newdiv.innerHTML = '<input type="text", id="' + _id + '_key", name="' + _id + 'key", placeholder="key"/>' + " : " +
+                        '<input type="text", id="' + _id + '_value", name="' + _id + 'value", placeholder="value"/>' +
+                        '  <button onclick="putData()">add</button>';
+                    doc.appendChild(newdiv);
+                }else{
+                    document.getElementById('input_form').remove()
+                }
+            };
 
-            const response = await fetch(url, {
-              method: 'PUT',
-              headers: {
-                'Content-type': 'application/json'
-              },
-              body: data
-            });
-
-          }
-        };
-
-        const setProperty = (obj, path, value) => {
-            const [head, ...rest] = path.split('.')
-
-            return {
-                ...obj,
-                [head]: rest.length
-                    ? setProperty(obj[head], rest.join('.'), value)
-                    : value
-            }
-        };
-
-        function deletePropertyPath (obj, path) {
-
-          if (!obj || !path) {
-            return;
-          }
-
-          if (typeof path === 'string') {
-            path = path.split('.');
-          }
-
-          for (var i = 0; i < path.length - 1; i++) {
-
-            obj = obj[path[i]];
-
-            if (typeof obj === 'undefined') {
-              return;
-            }
-          }
-
-          delete obj[path.pop()];
-        };
-
-        function addData(doc) {
-            if (doc.getElementsByTagName('div').length === 0){
-                showData(doc)
-            }
-
-            if (doc.getElementsByTagName('input').length == 0){
-                var newdiv = document.createElement('div')
+            function showData(doc) {
                 var _id = doc.getAttribute('id');
+                var new_data = data[_id];
                 var num_level = _id.split('_').length;
                 var margin = 20 * num_level;
-                newdiv.setAttribute('id', 'input_form')
-                newdiv.setAttribute('style', 'margin-left: ' + margin + 'px;');
-                newdiv.innerHTML = '<input type="text", id="' + _id + '_key", name="' + _id + 'key", placeholder="key"/>' + " : " +
-                    '<input type="text", id="' + _id + '_value", name="' + _id + 'value", placeholder="value"/>' +
-                    '  <button onclick="putData()">add</button>';
-                doc.appendChild(newdiv);
-            }
-        };
-
-        function putData(){
-            var input_element = document.getElementById('input_form')
-            var inputs = input_element.getElementsByTagName('input')
-            var key = inputs[0].value
-            var value = inputs[1].value
-            var _id = inputs[0].getAttribute('id').split('_')
-
-            _id.pop()
-            var combined_id = _id.join('/')
-            const http = new EasyHTTP;
-            const data = value
-            var link = 'http://127.0.0.1:5000/' + combined_id + '/' + key + '.json'
-            console.log(link)
-            http.put(link, data).then(data => console.log(data)).catch(err => console.log(err));
-
-        };
-
-        function showData(doc) {
-            var _id = doc.getAttribute('id');
-            var new_data = data[_id];
-            var num_level = _id.split('_').length;
-            var margin = 20 * num_level;
-            var divs = doc.getElementsByTagName('div');
-            var num_divs = divs.length;
-            console.log(doc)
-            if (divs.length > 0){
-                document.getElementById('button-'+_id).innerText = '>'
-                for (i=0; i < num_divs; i++){
-                    divs[0].remove();
-                }
-            }
-
-            else{
-                document.getElementById('button-'+_id).innerText = '<'
-
-                if (new_data) {
-                    for (i = 0; i <= new_data.length - 1; i++) {
-                        var record = new_data[i];
-                        var newdiv = document.createElement('div');
-
-                        var divIdName = _id + '_' + record['_id'];
-                        newdiv.setAttribute('id', divIdName);
-                        newdiv.setAttribute('style', 'margin-left: ' + margin + 'px;')
-                        if (typeof record['data'] == 'string' ){
-                            newdiv.innerHTML = '<h3>'+record['_id'] + " : " + record['data']+'</h3>';
-                        }else{
-                            newdiv.innerHTML = '<h3><button id="button-'+divIdName+'" onclick="showData('+divIdName+')">></button>    ' + record['_id'] +
-                            '    <button id="add-'+divIdName+'" onclick="addData('+divIdName+')" style="display: inline; border: none">+</button></h3>';
-                        }
-                        doc.appendChild(newdiv);
+                var divs = doc.getElementsByTagName('div');
+                var num_divs = divs.length;
+                console.log(doc)
+                if (divs.length > 0){
+                    document.getElementById('button-'+_id).innerText = '>'
+                    for (i=0; i < num_divs; i++){
+                        divs[0].remove();
                     }
                 }
 
                 else{
-                    var keys = _id.split('_');
-                    new_data = data[keys[0]];
-                    var results = new_data.filter(function (entry) { return entry._id === keys[1]; });
-                    new_data = results[0]['data'];
+                    document.getElementById('button-'+_id).innerText = '<'
 
-                    if (new_data){
-                        for (var _key in new_data){
-                            var divIdName = _id + '_' + _key;
-                            if (typeof new_data[_key] != 'object'){
-                                var newdiv = document.createElement('div');
-                                newdiv.setAttribute('id', divIdName)
-                                newdiv.setAttribute('style', 'margin-left: ' + margin + 'px;');
-                                newdiv.innerHTML = '<h3>'+ _key + " : " + new_data[_key] + '</h3>';
-                                doc.appendChild(newdiv);
+                    if (new_data) {
+                        for (i = 0; i <= new_data.length - 1; i++) {
+                            var record = new_data[i];
+                            var newdiv = document.createElement('div');
+
+                            var divIdName = _id + '_' + record['_id'];
+                            newdiv.setAttribute('id', divIdName);
+                            newdiv.setAttribute('style', 'margin-left: ' + margin + 'px;')
+                            if (typeof record['data'] == 'string' ){
+                                newdiv.innerHTML = '<h3>'+record['_id'] + " : " + record['data']+'' +
+                                    '   <button id="delete-'+divIdName+'" onclick="deleteData('+divIdName+')" style="display: inline; border: none">x</button></h3>';
+                            }else{
+                                newdiv.innerHTML = '<h3><button id="button-'+divIdName+'" onclick="showData('+divIdName+')">></button>    ' + record['_id'] +
+                                    '    <button id="add-'+divIdName+'" onclick="addData('+divIdName+')" style="display: inline; border: none">+</button>' +
+                                    '    <button id="delete-'+divIdName+'" onclick="deleteData('+divIdName+')" style="display: inline; border: none">x</button></h3>';
                             }
-                            else{
-                                var newdiv = document.createElement('div');
-                                newdiv.setAttribute('id', divIdName);
-                                newdiv.setAttribute('style', 'margin-left: ' + margin + 'px;')
-                                newdiv.innerHTML = '<h3><button id="button-'+divIdName+'" onclick="showData('+divIdName+')">></button>    ' + _key +
-                                    '    <button id="add-'+divIdName+'" onclick="addData('+divIdName+')" style="display: inline; border: none">+</button></h3>';
-                                doc.appendChild(newdiv);
+                            doc.appendChild(newdiv);
+                        }
+                    }
+
+                    else{
+                        var keys = _id.split('_');
+                        new_data = data[keys[0]];
+                        var results = new_data.filter(function (entry) { return entry._id === keys[1]; });
+                        new_data = results[0]['data'];
+
+                        if (new_data){
+                            for (var _key in new_data){
+                                var divIdName = _id + '_' + _key;
+                                if (typeof new_data[_key] != 'object'){
+                                    var newdiv = document.createElement('div');
+                                    newdiv.setAttribute('id', divIdName)
+                                    newdiv.setAttribute('style', 'margin-left: ' + margin + 'px;');
+                                    newdiv.innerHTML = '<h3>'+ _key + " : " + new_data[_key] + '' +
+                                        '   <button id="delete-'+divIdName+'" onclick="deleteData('+divIdName+')" style="display: inline; border: none">x</button></h3>';
+                                    doc.appendChild(newdiv);
+                                }
+                                else{
+                                    var newdiv = document.createElement('div');
+                                    newdiv.setAttribute('id', divIdName);
+                                    newdiv.setAttribute('style', 'margin-left: ' + margin + 'px;')
+                                    newdiv.innerHTML = '<h3><button id="button-'+divIdName+'" onclick="showData('+divIdName+')">></button>    ' + _key +
+                                        '    <button id="add-'+divIdName+'" onclick="addData('+divIdName+')" style="display: inline; border: none">+</button></h3>';
+                                    doc.appendChild(newdiv);
+                                }
                             }
                         }
                     }
                 }
-            }
-        };
-    </script>
+            };
+        </script>
+
+    </body>
 </html>
