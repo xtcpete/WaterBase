@@ -103,7 +103,10 @@ def catch_all_put(myPath):
             dict_data = list(map(lambda x, y: {"_id": str(x), "data": y}, range(len(dict_data)), dict_data))
     else:
         if len(request_info.key) == 0:  # create _id for data stored under the first level key
-            dict_data = [{"_id": '0', "data": dict_data}]
+            if len(list(dict_data.values())) == 1 and type(list(dict_data.values())[0]) == dict:
+                dict_data = [{"_id": list(dict_data.keys())[0], "data": list(dict_data.values())[0]}]
+            else:
+                dict_data = [{"_id": '0', "data": dict_data}]
 
     keys = request_info.key
 
@@ -153,14 +156,16 @@ def catch_all_get(myPath):
 
     else:
         operators = request_info.operators
+        match = {}
         if num_key > 0:
+            match['_id'] = keys[0]
             pre_target_var = "data." + '.'.join(keys[1:])
         else:
             pre_target_var = 'data.'
 
         if pre_target_var:
             # if there exist operators
-            match = {}
+
             pipeline = []
             if 'orderBy' in operators:
                 target_var = operators['orderBy']
@@ -170,6 +175,17 @@ def catch_all_get(myPath):
                 else:
                     if target_var == '$key':
                         target_var = '_id'
+                    elif target_var == '$value':
+                        if 'createIndex' in operators:
+                            attribute = operators['createIndex']
+                            target_var = pre_target_var + attribute
+                            data_collect.create_index(target_var, name='$value')
+                        index_info = data_collect.index_information()
+                        if '$value' in index_info:
+                            target_var = index_info['$value']['key'][0][0]
+                        else:
+                            return 'Please create index by adding createIndex=Name of the value to the end of your ' \
+                                   'request '
                 for operation in operators:
                     if operation != 'orderBy':
                         if operation == 'startAt':
@@ -195,6 +211,8 @@ def catch_all_get(myPath):
                             sort = ''
                     else:
                         sort = {'$sort': {target_var: 1}}
+                        if match != {}:
+                            pipeline.append({'$match': match})
                         pipeline.append(sort)
                 if pipeline == []:
                     return "Error: Operation not found"
@@ -224,7 +242,6 @@ def catch_all_get(myPath):
         return jsonify(data)
     else:
         return ""
-        return "Error: Data format incorrect"
 
 @app.route('/<path:myPath>', methods=['POST'])
 def catch_all_post(myPath):
@@ -342,7 +359,7 @@ def catach_all_patch(myPath):
     # check the length of keys
     num_key = len(keys)
 
-    if num_key == 0: # no sub key, just insert into the collection
+    if num_key == 0:  # no sub key, just insert into the collection
         data_collect.drop()
         data_collect.insert_many(dict_data)
     elif num_key == 1:

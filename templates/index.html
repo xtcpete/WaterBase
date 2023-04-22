@@ -284,9 +284,14 @@
 
                     else{
                         var keys = _id.split('_');
+                        console.log(keys)
                         new_data = data[keys[0]];
+                        console.log(new_data)
                         var results = new_data.filter(function (entry) { return entry._id === keys[1]; });
                         new_data = results[0]['data'];
+                        if (keys.length > 2){
+                            new_data = new_data[keys[keys.length-1]]
+                        }
 
                         if (new_data){
                             for (var _key in new_data){
@@ -301,10 +306,12 @@
                                 }
                                 else{
                                     var newdiv = document.createElement('div');
+                                    console.log(divIdName)
                                     newdiv.setAttribute('id', divIdName);
                                     newdiv.setAttribute('style', 'margin-left: ' + margin + 'px;')
                                     newdiv.innerHTML = '<h3><button id="button-'+divIdName+'" onclick="showData('+divIdName+')">></button>    ' + _key +
-                                        '    <button id="add-'+divIdName+'" onclick="addData('+divIdName+')" style="display: inline; border: none">+</button></h3>';
+                                    '    <button id="add-'+divIdName+'" onclick="addData('+divIdName+')" style="display: inline; border: none">+</button>' +
+                                    '    <button id="delete-'+divIdName+'" onclick="deleteData('+divIdName+')" style="display: inline; border: none">x</button></h3>';
                                     doc.appendChild(newdiv);
                                 }
                             }
