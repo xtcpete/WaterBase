@@ -224,6 +224,7 @@ def catch_all_get(myPath):
         return jsonify(data)
     else:
         return ""
+        return "Error: Data format incorrect"
 
 @app.route('/<path:myPath>', methods=['POST'])
 def catch_all_post(myPath):
@@ -321,12 +322,39 @@ def catch_all_delete(myPath):
 @app.route('/<path:myPath>', methods=['PATCH'])
 def catach_all_patch(myPath):
     request_info = RequestInfo()
+    db = MongoDB(request_info.root_database).db
+    # access the collection
+    data_collect = db[request_info.collection]
+    json_data = request_info.data
+    # load it into dictionary, if data sent are not a valid json, store it as string
+    try:
+        dict_data = json.loads(json_data)
+    except:
+        return str(json_data) + " Not a valid json"
 
     db = MongoDB(request_info.root_database)
     collection = db[request_info.collection]
     json_data = request_info['data']
 
     return "PATCH"
+    keys = request_info.key
+
+    # check the length of keys
+    num_key = len(keys)
+
+    if num_key == 0: # no sub key, just insert into the collection
+        data_collect.drop()
+        data_collect.insert_many(dict_data)
+    elif num_key == 1:
+        data = {"$set": {'data': dict_data}}
+        data_collect.update_one({'_id': keys[0]}, data, upsert=False)
+    else:
+        # nested document
+        joined_key = 'data.' + '.'.join(keys[1:])
+        data = {"$set": {joined_key: dict_data}}
+        data_collect.update_one({'_id': keys[0]}, data, upsert=False)
+
+    return ''
 
 
 if __name__ == '__main__':
