@@ -104,9 +104,6 @@ def catch_all_put(myPath):
     else:
         if len(request_info.key) == 0:  # create _id for data stored under the first level key
             dict_data = [{"_id": '0', "data": dict_data}]
-        else:
-            if len(request_info.key) == 1:
-                dict_data = [{"_id": request_info.key[0], 'data': dict_data}]
 
     keys = request_info.key
 
@@ -165,7 +162,6 @@ def catch_all_get(myPath):
             pipeline = []
             if 'orderBy' in operators:
                 target_var = 'data.' + operators['orderBy']
-                data_collect.create_index(target_var)
                 for operation in operators:
                     if operation != 'orderBy':
                         if operation == 'startAt':
@@ -305,7 +301,7 @@ def catch_all_delete(myPath):
     all_data = {}.fromkeys(collections)
     for collection in collections:
         all_data[collection] = [x for x in db.get_collection(collection).find()]
-    socketio.emit('delete', {'collection': request_info.collection, 'keys':request_info.key, 'data': all_data}, broadcast=True)
+    socketio.emit('delete', {'collection': request_info.collection, 'keys':request_info.key, 'data': all_data})
     return ""
 
 
