@@ -242,6 +242,9 @@ def catch_all_get(myPath):
         return jsonify(data)
     else:
         return ""
+=======
+        return "Error: Data format incorrect"
+>>>>>>> Stashed changes
 
 @app.route('/<path:myPath>', methods=['POST'])
 def catch_all_post(myPath):
@@ -265,6 +268,13 @@ def catch_all_post(myPath):
     # check the length of keys
     num_key = len(keys)
 
+    N = 8
+    res = ''.join(random.choices(string.ascii_letters, k=N))    
+    if num_key == 0:
+        data = {"$set": {'data': dict_data}}
+        data_collect.update_one({'_id': res}, data, upsert=True)
+        return ""
+    
     if num_key == 1:
         data = {"$set": {"data": dict_data}}
         # check if the key exists
@@ -352,6 +362,9 @@ def catach_all_patch(myPath):
     db = MongoDB(request_info.root_database)
     collection = db[request_info.collection]
     json_data = request_info['data']
+  
+    # check if it is a list and then add id to the data
+        
 
     return "PATCH"
     keys = request_info.key
@@ -365,11 +378,13 @@ def catach_all_patch(myPath):
     elif num_key == 1:
         data = {"$set": {'data': dict_data}}
         data_collect.update_one({'_id': keys[0]}, data, upsert=False)
+        data_collect.update_one({'_id': keys[0]}, data, upsert=True)
     else:
         # nested document
         joined_key = 'data.' + '.'.join(keys[1:])
         data = {"$set": {joined_key: dict_data}}
         data_collect.update_one({'_id': keys[0]}, data, upsert=False)
+        data_collect.update_one({'_id': keys[0]}, data, upsert=True)
 
     return ''
 
