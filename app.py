@@ -144,24 +144,32 @@ def catch_all_get(myPath):
     if request_info.operators == {}:
         # check for the number of keys
         if num_key == 0:
-            cursor = data_collect.find({}, {'data':1, '_id':0})
+            cursor = data_collect.find({}, {'data':1, '_id':1})
         elif num_key == 1:
-            cursor = data_collect.find({'_id': keys[0]}, {'data': 1, '_id': 0})
+            cursor = data_collect.find({'_id': keys[0]}, {'data': 1, '_id': 1})
         else:
             joined_key = "data." + '.'.join(keys[1:])
-            cursor = data_collect.find({'_id': keys[0], joined_key: {"$exists": True}}, {joined_key: 1, '_id': 0})
+            cursor = data_collect.find({'_id': keys[0], joined_key: {"$exists": True}}, {joined_key: 1, '_id': 1})
 
     else:
+        operators = request_info.operators
         if num_key > 0:
-            raise NotImplementedError
+            pre_target_var = "data." + '.'.join(keys[1:])
         else:
+            pre_target_var = 'data.'
 
+        if pre_target_var:
             # if there exist operators
             match = {}
-            operators = request_info.operators
             pipeline = []
             if 'orderBy' in operators:
-                target_var = 'data.' + operators['orderBy']
+                target_var = operators['orderBy']
+                if '$' not in target_var:
+                    target_var = pre_target_var + target_var
+                    data_collect.create_index(target_var)
+                else:
+                    if target_var == '$key':
+                        target_var = '_id'
                 for operation in operators:
                     if operation != 'orderBy':
                         if operation == 'startAt':
@@ -185,10 +193,12 @@ def catch_all_get(myPath):
                             pipeline.append(limit)
                         else:
                             sort = ''
+                    else:
+                        sort = {'$sort': {target_var: 1}}
+                        pipeline.append(sort)
                 if pipeline == []:
                     return "Error: Operation not found"
-                elif '$sort' not in pipeline:
-                    pipeline.append({'$sort':{target_var:1}})
+
                 cursor = data_collect.aggregate(pipeline)
 
     data = []
@@ -196,6 +206,9 @@ def catch_all_get(myPath):
     for document in cursor:
         # loop over keys to get only the stored value
         temp = document['data']
+        if '_id' in document:
+            key = document['_id']
+            temp = {key: temp}
         if len(keys) > 1:
             i = 1
             while i <= len(keys) - 1:
