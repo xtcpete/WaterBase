@@ -261,48 +261,20 @@ def catch_all_post(myPath):
     # check the length of keys
     num_key = len(keys)
     N = 8
-    res = ''.join(random.choices(string.ascii_letters, k=N))    
+    res = ''.join(random.choices(string.ascii_letters, k=N))
     if num_key == 0:
-        data = {"$set": {'data': dict_data}}
-        data_collect.update_one({'_id': res}, data, upsert=True)
+        dict_data = {"_id": res, "data": dict_data}
+        data_collect.insert_one(dict_data)
         return ""
-    
-    if num_key == 1:
-        data = {"$set": {"data": dict_data}}
-        # check if the key exists
-        cursor = data_collect.find({keys[0]: {"$exists": True}})
-
-        if len(list(cursor)) > 0: # already exists
-            N = 8
-            # using random.choices()
-            # generating random strings
-            res = ''.join(random.choices(string.ascii_letters, k=N))
-
-            data_collect.insert_one({keys[0] + '_' + res: dict_data})
-            msg = str({"name": keys[0]+'_'+res})
-        else:
-            data_collect.insert_one({keys[0]: dict_data})
-            msg = ''
-
+    elif (num_key == 1):
+        data = {"$set": {'data.' + res: dict_data}}
+        data_collect.update_one({'_id': keys[0]}, data, upsert=True)
+        return ""
     else:
-        joined_key = '.'.join(keys)
-        cursor = data_collect.find({joined_key: {"$exists": True}})
-        if len(list(cursor)) > 0:  # already exists:
-            N = 8
-            # using random.choices()
-            # generating random strings
-            res = ''.join(random.choices(string.ascii_letters, k=N))
-
-            data = {"$set": {joined_key + '_' +res: dict_data}}
-            data_collect.update_one({keys[0]: {"$exists": True}}, data, upsert=True)
-            msg = str({"name": keys[-1] + '_' + res})
-        else:
-            data = {"$set": {joined_key: dict_data}}
-            data_collect.update_one({keys[0]: {"$exists": True}}, data, upsert=True)
-            msg = ''
-
-    return msg
-
+        joined_key = 'data.' + '.'.join(keys[1:] + [res])
+        data = {"$set": {joined_key: dict_data}}
+        data_collect.update_one({'_id': keys[0]}, data, upsert=True)
+        return ""
 
 @app.route('/<path:myPath>', methods=['DELETE'])
 def catch_all_delete(myPath):
