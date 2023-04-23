@@ -133,6 +133,28 @@
                     document.body.appendChild(newdiv);
                 }
             };
+
+            function refreshData (keys, popKey = false){
+
+                console.log(keys)
+                if (popKey){
+                    keys.pop()
+                }
+
+                element_id = keys.join("_");
+                var element = document.getElementById(element_id);
+
+                if (element != null) {
+                    console.log("element", element)
+                    showData(element)
+
+                    showData(element)
+                } else {
+                    document.body.innerHTML = '<h1>Welcome to WaterBase</h1><button id="add-collection" onclick="addCollection()">+</button>'
+
+                    createCollectionElement(data)
+                }
+            }
         </script>
     </head>
 
@@ -149,55 +171,75 @@
             document.addEventListener('DOMContentLoaded', () => {
                 var socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
 
-                socket.on('put', (_data) => {
+                socket.on('update', (_data) => {
                     var collection = _data['collection'];
                     var keys = _data['keys'];
                     var new_data = _data['data'];
                     var dataToChange = data[collection];
                     var element_id = collection + '_' + keys.join("_");
-                    console.log(keys)
+
                     if (keys.length > 0){
                         var foundIndex = dataToChange.findIndex(x => x._id == keys[0]);
-                        console.log(foundIndex)
+                        console.log("index", foundIndex)
                         if (foundIndex >= 0){
                             dataToChange = dataToChange[foundIndex];
                             keys.shift();
-                            var dataChanged = setProperty(dataToChange, 'data.'+keys.join('.'), new_data);
+                            console.log('dataToChange', dataToChange)
+                            var path
+                            if (keys.length > 0){
+                                path = 'data.'+keys.join('.')
+                            }
+                            else{
+                                path = 'data'
+                            }
+                            var dataChanged = setProperty(dataToChange, path, new_data);
+                            console.log("dataChanged", dataChanged)
                             data[collection][foundIndex] = dataChanged;
                         }
-                        else{
+                        else {
                             var dataChanged = {'_id': keys[0], 'data': new_data};
                             data[collection].push(dataChanged);
                         }
-                        console.log(data);
                     }
                     else{
                         data[collection] = new_data;
                     }
 
+
                     var element = document.getElementById(element_id);
+                    console.log("element", element_id)
 
-                    if (element != null){
-                        element.innerText = keys[keys.length-1]+" : "+new_data;
-                    }
-                    else {
-                        var keys = element_id.split('_')
-                        keys.pop()
-                        element_id = keys.join("_");
-                        var element = document.getElementById(element_id);
-                        console.log(element_id)
-                        console.log(data)
-                        if (element != null){
-                            showData(element)
+                    var popKey = false;
+                    if (element != null) {
+                        if (!element.innerText.includes("+")) {
+                            console.log('type',typeof new_data)
+                            if (typeof new_data == "object"){
+                                var parentElement = element.parentElement
 
-                            showData(element)
+                                showData(parentElement)
+
+                                showData(parentElement)
+
+                            }else{
+                                console.log('fffffffffffffffffff')
+                                element.innerHTML = '<h3>' + keys[keys.length - 1] + " : " + new_data +
+                                '   <button id="delete-' + element_id + '" onclick="deleteData(' + element_id + ')" style="display: inline; border: none">x</button></h3>'
+                            }
+
+                        } else {
+                            if (typeof new_data != "object"){
+                                popKey = true
+                            }
+                            var keys = element_id.split('_');
+                            refreshData(keys, popKey);
                         }
-                        else{
-                            document.body.innerHTML = '<h1>Welcome to WaterBase</h1><button id="add-collection" onclick="addCollection()">+</button>'
-                            console.log(data)
-                            createCollectionElement(data)
-                        }
+                    } else {
+                        popKey = true
+                        var keys = element_id.split('_');
+                        refreshData(keys, popKey);
                     }
+
+                    console.log("data", data);
                 });
 
                 socket.on('delete', (_data) => {

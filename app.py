@@ -71,6 +71,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app)
 
+
 @app.route('/')
 def index():
     db = MongoDB('root').db
@@ -113,7 +114,7 @@ def catch_all_put(myPath):
     # check the length of keys
     num_key = len(keys)
 
-    if num_key == 0: # no sub key, just insert into the collection
+    if num_key == 0:  # no sub key, just insert into the collection
         data_collect.drop()
         data_collect.insert_many(dict_data)
     elif num_key == 1:
@@ -125,7 +126,7 @@ def catch_all_put(myPath):
         data = {"$set": {joined_key: dict_data}}
         data_collect.update_one({'_id': keys[0]}, data, upsert=True)
 
-    socketio.emit('put', {'collection': request_info.collection, 'keys': keys, "data": dict_data})
+    socketio.emit('update', {'collection': request_info.collection, 'keys': keys, "data": dict_data})
     return ''
 
 
@@ -147,7 +148,7 @@ def catch_all_get(myPath):
     if request_info.operators == {}:
         # check for the number of keys
         if num_key == 0:
-            cursor = data_collect.find({}, {'data':1, '_id':1})
+            cursor = data_collect.find({}, {'data': 1, '_id': 1})
         elif num_key == 1:
             cursor = data_collect.find({'_id': keys[0]}, {'data': 1, '_id': 1})
         else:
@@ -199,12 +200,12 @@ def catch_all_get(myPath):
                             pipeline.append({'$match': {target_var: match}})
                         elif operation == 'limitToFirst':
                             limit = {'$limit': int(operators[operation])}
-                            sort = {'$sort':{target_var:1}}
+                            sort = {'$sort': {target_var: 1}}
                             pipeline.append(sort)
                             pipeline.append(limit)
                         elif operation == 'limitToLast':
                             limit = {'$limit': int(operators[operation])}
-                            sort = {'$sort':{target_var:-1}}
+                            sort = {'$sort': {target_var: -1}}
                             pipeline.append(sort)
                             pipeline.append(limit)
                         else:
@@ -242,7 +243,8 @@ def catch_all_get(myPath):
         return jsonify(data)
     else:
 
-        return "Error: Data format incorrect"
+        return "Error: Add .json to the url"
+
 
 @app.route('/<path:myPath>', methods=['POST'])
 def catch_all_post(myPath):
@@ -262,19 +264,24 @@ def catch_all_post(myPath):
     num_key = len(keys)
     N = 8
     res = ''.join(random.choices(string.ascii_letters, k=N))
+    collection = request_info.collection
     if num_key == 0:
         dict_data = {"_id": res, "data": dict_data}
         data_collect.insert_one(dict_data)
-        return ""
+        collection = res
+
     elif (num_key == 1):
         data = {"$set": {'data.' + res: dict_data}}
         data_collect.update_one({'_id': keys[0]}, data, upsert=True)
-        return ""
+
     else:
         joined_key = 'data.' + '.'.join(keys[1:] + [res])
         data = {"$set": {joined_key: dict_data}}
         data_collect.update_one({'_id': keys[0]}, data, upsert=True)
-        return ""
+
+    socketio.emit('update', {'collection': collection, 'keys': keys + [res], "data": dict_data})
+    return ""
+
 
 @app.route('/<path:myPath>', methods=['DELETE'])
 def catch_all_delete(myPath):
@@ -305,7 +312,7 @@ def catch_all_delete(myPath):
     all_data = {}.fromkeys(collections)
     for collection in collections:
         all_data[collection] = [x for x in db.get_collection(collection).find()]
-    socketio.emit('delete', {'collection': request_info.collection, 'keys':request_info.key, 'data': all_data})
+    socketio.emit('delete', {'collection': request_info.collection, 'keys': request_info.key, 'data': all_data})
     return ""
 
 
@@ -322,9 +329,7 @@ def catach_all_patch(myPath):
     except:
         return str(json_data) + " Not a valid json"
 
-  
     # check if it is a list and then add id to the data
-        
 
     keys = request_info.key
 
@@ -343,6 +348,7 @@ def catach_all_patch(myPath):
         data = {"$set": {joined_key: dict_data}}
         data_collect.update_one({'_id': keys[0]}, data, upsert=True)
 
+    socketio.emit('update', {'collection': request_info.collection, 'keys': keys, "data": dict_data})
     return ''
 
 
