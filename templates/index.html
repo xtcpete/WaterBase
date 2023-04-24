@@ -278,7 +278,7 @@
                     newdiv.setAttribute('id', 'input_form')
                     newdiv.setAttribute('style', 'margin-left: ' + margin + 'px;');
                     newdiv.innerHTML = '<input type="text", id="' + _id + '_key", name="' + _id + 'key", placeholder="key"/>' + " : " +
-                        '<input type="text", id="' + _id + '_value", name="' + _id + 'value", placeholder="value"/>' +
+                        '<input type="text", id="' + _id + '_value", name="' + _id + 'value", placeholder="value (in json format)"/>' +
                         '  <button onclick="putData()">add</button>';
                     doc.appendChild(newdiv);
                 }else{
