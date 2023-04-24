@@ -172,7 +172,12 @@ def catch_all_get(myPath):
                 target_var = operators['orderBy']
                 if '$' not in target_var:
                     target_var = pre_target_var + target_var
-                    data_collect.create_index(target_var)
+                    try:
+                        data_collect.create_index(target_var)
+                    except:
+                        data_collect.drop_index('$value')
+                        data_collect.create_index(target_var)
+
                 else:
                     if target_var == '$key':
                         target_var = '_id'
@@ -180,7 +185,12 @@ def catch_all_get(myPath):
                         if 'createIndex' in operators:
                             attribute = operators['createIndex']
                             target_var = pre_target_var + attribute
-                            data_collect.create_index(target_var, name='$value')
+                            try:
+                                data_collect.create_index(target_var, name='$value')
+                            except:
+                                data_collect.drop_index(target_var+'_1')
+                                data_collect.create_index(target_var, name='$value')
+
                         index_info = data_collect.index_information()
                         if '$value' in index_info:
                             target_var = index_info['$value']['key'][0][0]
