@@ -88,7 +88,7 @@
                 const value = inputs[1].value
                 const _id = inputs[0].getAttribute('id').split('_')
                 const http = new EasyHTTP;
-
+                console.log(_id)
                 if (_id[0] =='collection'){
                     const data = value
                     const link = 'http://127.0.0.1:5000/' + key + '.json'

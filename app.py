@@ -132,6 +132,7 @@ def catch_all_put(myPath):
 
 @app.route('/<path:myPath>', methods=['GET'])
 def catch_all_get(myPath):
+
     request_info = RequestInfo()
 
     db = MongoDB(request_info.root_database).db
@@ -188,7 +189,11 @@ def catch_all_get(myPath):
                             try:
                                 data_collect.create_index(target_var, name='$value')
                             except:
-                                data_collect.drop_index(target_var+'_1')
+                                try:
+                                    data_collect.drop_index(target_var+'_1')
+                                except:
+                                    data_collect.drop_index('$value')
+
                                 data_collect.create_index(target_var, name='$value')
 
                         index_info = data_collect.index_information()
@@ -197,6 +202,7 @@ def catch_all_get(myPath):
                         else:
                             return 'Please create index by adding createIndex=Name of the value to the end of your ' \
                                    'request '
+
                 for operation in operators:
                     if operation != 'orderBy':
                         if operation == 'startAt':
