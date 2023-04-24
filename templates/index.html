@@ -177,7 +177,7 @@
                     var new_data = _data['data'];
                     var dataToChange = data[collection];
                     var element_id = collection + '_' + keys.join("_");
-
+                    console.log(collection)
                     if (keys.length > 0){
                         var foundIndex = dataToChange.findIndex(x => x._id == keys[0]);
                         console.log("index", foundIndex)

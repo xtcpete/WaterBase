@@ -284,7 +284,6 @@ def catch_all_post(myPath):
     if num_key == 0:
         dict_data = {"_id": res, "data": dict_data}
         data_collect.insert_one(dict_data)
-        collection = res
 
     elif (num_key == 1):
         data = {"$set": {'data.' + res: dict_data}}
